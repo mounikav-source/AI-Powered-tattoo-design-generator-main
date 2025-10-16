@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate
+import base64
 
 # Function to enhance the prompt using Groq
 def make_prompt(simple_prompt, style, color, size, placement):
@@ -124,32 +125,42 @@ with st.form(key='tattoo_form'):
 
 # Handle form submission
 if submit_button:
-    if st.session_state['desc'].strip() == "":
+
+    if not description or description.strip() == "":
         st.error("Please enter a description.")
     else:
         with st.spinner("Enhancing prompt and generating tattoo..."):
-            # Enhance the user's description
-            enhanced_description = make_prompt(
-                st.session_state['desc'],
-                st.session_state['style'],
-                st.session_state['color'],
-                st.session_state['size'],
-                st.session_state['placement']
+           
+           
+
+            # Construct the prompt with explicit body placement
+            prompt = (
+                f"Generate an image of a tattoo design featuring  "
+                f"in {style} style with {color_scheme} colors. The size should be {size}, "
+                f"realistically placed on the {placement} of a human body. Provide a clear description "
+                f"for the tattoo size and placement."
             )
-            
-            # Construct the prompt with explicit body placement            
-            prompt = f"Generate an image of a tattoo design featuring {enhanced_description} in {st.session_state['style']} style with {st.session_state['color']} colors,The size should be {st.session_state['size']},realistically placed on the {st.session_state['placement']} of a human body.,give proper discription for size of the tattoo"
-            caption = f"Generated Tattoo on {st.session_state['placement']}"
+            caption = f"Generated Tattoo on {placement}"
 
             # Generate the tattoo image
             result, mime_type = generate_tattoo(prompt)
-            if mime_type:
-                st.image(result, caption=caption, use_container_width=True)
-                extension = mimetypes.guess_extension(mime_type)
-                file_name = f"tattoo{extension}" if extension else "tattoo"
+
+            if mime_type and result:
+                # result may be bytes or a base64 string; handle both
+                if isinstance(result, str):
+                    try:
+                        image_bytes = base64.b64decode(result)
+                    except Exception:
+                        image_bytes = result.encode()
+                else:
+                    image_bytes = result
+
+                st.image(image_bytes, caption=caption, use_container_width=True)
+                extension = mimetypes.guess_extension(mime_type) or ""
+                file_name = f"tattoo{extension}"
                 st.download_button(
                     label="Download Image",
-                    data=result,
+                    data=image_bytes,
                     file_name=file_name,
                     mime=mime_type,
                 )
